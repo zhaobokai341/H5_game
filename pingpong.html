@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>乒乓球游戏</title>
+    <style>
+        #planks div{
+            width: 10px;
+            height: 100px;
+            position: absolute;
+        }
+        #planks div:first-child{
+            background-color :red;
+            left: 10px;
+        }
+        #planks div:last-child{
+            background-color: yellow;
+            right: 10px;
+        }
+        #score p{
+            color: white;
+            font-size: 40px;
+            position: absolute;
+        }
+        #score p:first-child{
+            left: 10px;
+        }
+        #score p:last-child{
+            right: 10px;
+        }
+    </style>
+</head>
+<body style="background-color:black">
+    <div id="planks">
+        <div></div>
+        <div></div>
+    </div>
+    <div id="ball"></div>
+    <div id="score">
+        <p></p>
+        <p></p>
+    </div>
+    <script>
+        var planks_div = document.getElementById("planks");
+        var planks = planks_div.getElementsByTagName("div");
+        var ball_div = document.getElementById("ball");
+        var ball_list = []
+        var score_div = document.getElementById("score");
+        var score = score_div.getElementsByTagName("p");
+        function Ball(){
+            this.move = [0, 0];
+            while(1){
+                this.move = [Math.random() * (3 - -3 + 1) + -3,Math.random() * (3 - -3 + 1) + -3];
+                if(this.move[0]<-1||this.move[0]>1){
+                    break;
+                }
+            }
+            this.position = [window.innerWidth/2, window.innerHeight/2];
+        }
+        function init(){
+            for(var i=0;i<planks.length;i++){
+                planks[i].style.top = Math.ceil(Math.random()*(window.innerHeight - 100)) + "px";
+            }
+            score[0].innerHTML = 0;
+            score[1].innerHTML = 0;
+        }
+        function me_move(){
+            document.addEventListener('mousemove', function(event) {
+                var mouseY = event.pageY; // Y-coordinate relative to the document
+                var planks1_y = parseInt(planks[0].style.top.replace("px",""));
+                if(planks1_y < 0){
+                    planks[0].style.top = planks1_y + 10 + "px"
+                }else if(planks1_y > innerHeight-110){
+                    planks[0].style.top = planks1_y - 10 + "px"
+                }else if(planks1_y < mouseY){
+                    planks[0].style.top = planks1_y + 10 + "px";
+                }else if(planks1_y > mouseY){
+                    planks[0].style.top = planks1_y - 10 + "px";
+                }
+            });
+        }
+        function ai_move(){
+            var recent = 9999;
+            for(var i=0;i<=)
+        }
+        function ball(){
+            setInterval(function(){
+                if(ball_list!=[]){
+                    var ball_div_ = ball_div.getElementsByTagName("div");
+                    for(var i=0;i<ball_list.length;i++){
+                        if(ball_div_.length==i){
+                            var ball_element = document.createElement("div");
+                            ball_element.style.width = 10 + "px";
+                            ball_element.style.height = 10 + "px";
+                            ball_element.style.backgroundColor = "white";
+                            ball_element.style.borderRadius = 10 + "px";
+                            ball_element.style.position = "absolute";
+                            ball_element.style.left = ball_list[i].position[0] + "px";
+                            ball_element.style.top = ball_list[i].position[1] + "px";
+                            ball_div.appendChild(ball_element);
+                        }else{
+                            ball_div_[i].style.left = parseInt(ball_div_[i].style.left.replace("px","")) + (ball_list[i].move[0] * 3) + "px";
+                            ball_div_[i].style.top = parseInt(ball_div_[i].style.top.replace("px","")) + (ball_list[i].move[1] * 3) + "px";
+                        }
+                        var ball_left = parseInt(ball_div_[i].style.left.replace("px",""));
+                        var ball_top = parseInt(ball_div_[i].style.top.replace("px",""));
+                        if(ball_left <= 0){
+                            score[1].innerHTML = parseInt(score[1].innerHTML) + 1;
+                            ball_div.removeChild(ball_div_[i]);
+                            ball_list.splice(i, 1);
+                            continue;
+                        }else if(ball_left >= window.innerWidth - 15){
+                            score[0].innerHTML = parseInt(score[0].innerHTML) + 1;
+                            ball_div.removeChild(ball_div_[i]);
+                            ball_list.splice(i, 1);
+                            continue;
+                        }else if(ball_top <= 0 || ball_top >= window.innerHeight - 20){
+                            ball_list[i].move[1] = ball_list[i].move[1]>0 ? -ball_list[i].move[1] : Math.abs(ball_list[i].move[1]);
+                        }
+                        // ball box
+                        var bx = parseInt(ball_div_[i].style.left, 10);
+                        var by = parseInt(ball_div_[i].style.top, 10);
+                        var bw = 10, bh = 10; // your ball size
+
+                        // left paddle bounds
+                        var p1Left = planks[0].offsetLeft;
+                        var p1Top = planks[0].offsetTop;
+                        var p1Right = p1Left + planks[0].offsetWidth;
+                        var p1Bottom = p1Top + planks[0].offsetHeight;
+
+                        // right paddle bounds
+                        var p2Left = planks[1].offsetLeft;
+                        var p2Top = planks[1].offsetTop;
+                        var p2Right = p2Left + planks[1].offsetWidth;
+                        var p2Bottom = p2Top + planks[1].offsetHeight;
+
+                        // collision with left paddle -> bounce right
+                        if (bx <= p1Right && bx + bw >= p1Left && by + bh >= p1Top && by <= p1Bottom) {
+                          ball_list[i].move[0] = Math.abs(ball_list[i].move[0]);
+                        }
+
+                        // collision with right paddle -> bounce left
+                        if (bx + bw >= p2Left && bx <= p2Right && by + bh >= p2Top && by <= p2Bottom) {
+                          ball_list[i].move[0] = -Math.abs(ball_list[i].move[0]);
+                        }
+                    }
+                }
+            }, 30)
+        }
+        init();
+        setInterval(me_move(), 100);
+        setInterval(ai_move(), 100);
+        setInterval(function(){ball_list.push(new Ball())}, 1);
+        ball();
+    </script>
+</body>
+</html>
