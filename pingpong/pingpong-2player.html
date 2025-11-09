@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Ping Pong - Two Player</title>
+  <title>Ping Pong - Two Player (Multi-ball)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <div class="container">
     <h1>Ping Pong - Two Player</h1>
-    <div class="desc">Left: W/S or left buttons. Right: ↑/↓ or right buttons. Space: Pause/Resume.</div>
+    <div class="desc">Left: W/S or left buttons. Right: ↑/↓ or right buttons. Space: Pause/Resume. New ball every 10s.</div>
 
     <div id="gameWrap">
       <canvas id="gameCanvas" width="800" height="500"></canvas>
@@ -35,23 +35,25 @@
 
   <script src="js/common.js"></script>
   <script>
-    // Two-player game: uses shared PauseManager + UI
-    const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
-    const pauseBtn = document.getElementById('btn-pause');
+    // Two-player multi-ball implementation with shared PauseManager + SpawnManager
 
-    const paddleHeight = 100, paddleWidth = 15, ballSize = 15;
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const paddleHeight = 100;
+    const paddleWidth = 15;
+    const ballSize = 15;
     const paddleSpeed = 7;
+
+    // Paddles and scores
     let leftPaddleY = PP.INTERNAL_HEIGHT / 2 - paddleHeight / 2;
     let rightPaddleY = PP.INTERNAL_HEIGHT / 2 - paddleHeight / 2;
-    let leftScore = 0, rightScore = 0;
+    let leftScore = 0;
+    let rightScore = 0;
 
-    // keyboard flags via PP.Input
+    // Input
     const keys = PP.Input.initKeyboard();
-
-    // touch flags
     let leftTouchUp = false, leftTouchDown = false, rightTouchUp = false, rightTouchDown = false;
-
-    // Setup pointer buttons
     PP.Input.setupButtons([
       { id: 'btn-left-up', onDown: v => leftTouchUp = v },
       { id: 'btn-left-down', onDown: v => leftTouchDown = v },
@@ -59,74 +61,130 @@
       { id: 'btn-right-down', onDown: v => rightTouchDown = v }
     ]);
 
-    // Single-ball state
-    let ball = {
-      x: PP.INTERNAL_WIDTH/2 - ballSize/2,
-      y: PP.INTERNAL_HEIGHT/2 - ballSize/2,
-      vx: 5 * (Math.random() < 0.5 ? 1 : -1),
-      vy: 3 * (Math.random() < 0.5 ? 1 : -1),
-      size: ballSize
-    };
+    // Multi-ball state
+    let balls = [];
+    const state = { balls, paused: false, ballOpts: { size: ballSize } };
+    const spawner = new PP.SpawnManager(state);
 
-    // Pause state manager (no spawner needed here)
-    const state = { paused: false };
-    const pauseManager = new PP.PauseManager(state, null);
+    // Pause manager + UI
+    const pauseManager = new PP.PauseManager(state, spawner);
     const pauseControl = PP.UI.setupPauseButton('btn-pause', pauseManager, { pausedOverlayId: 'pausedText', pauseLabel: 'Pause', resumeLabel: 'Resume' });
 
-    function draw(){
-      ctx.clearRect(0,0,PP.INTERNAL_WIDTH,PP.INTERNAL_HEIGHT);
+    // Create initial ball and ensure it has a standard initial speed
+    function createInitialBall() {
+      const b = new PP.Ball({ size: ballSize });
+      b.vx = 5 * (Math.random() < 0.5 ? 1 : -1);
+      b.vy = 3 * (Math.random() < 0.5 ? 1 : -1);
+      balls.push(b);
+    }
+    createInitialBall();
+
+    // Draw everything
+    function draw() {
+      ctx.clearRect(0, 0, PP.INTERNAL_WIDTH, PP.INTERNAL_HEIGHT);
+
+      // center line
       ctx.strokeStyle = "#fff"; ctx.setLineDash([10,10]);
-      ctx.beginPath(); ctx.moveTo(PP.INTERNAL_WIDTH/2,0); ctx.lineTo(PP.INTERNAL_WIDTH/2,PP.INTERNAL_HEIGHT); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(PP.INTERNAL_WIDTH / 2, 0); ctx.lineTo(PP.INTERNAL_WIDTH / 2, PP.INTERNAL_HEIGHT); ctx.stroke(); ctx.setLineDash([]);
+
+      // scores
       ctx.font = "36px Arial"; ctx.fillStyle = "#fff";
-      ctx.fillText(leftScore, PP.INTERNAL_WIDTH/2 - 50, 50);
-      ctx.fillText(rightScore, PP.INTERNAL_WIDTH/2 + 30, 50);
+      ctx.fillText(leftScore, PP.INTERNAL_WIDTH / 2 - 50, 50);
+      ctx.fillText(rightScore, PP.INTERNAL_WIDTH / 2 + 30, 50);
 
-      ctx.fillStyle = "#0f0"; ctx.fillRect(10, leftPaddleY, paddleWidth, paddleHeight);
-      ctx.fillStyle = "#f00"; ctx.fillRect(PP.INTERNAL_WIDTH - paddleWidth - 10, rightPaddleY, paddleWidth, paddleHeight);
+      // paddles
+      ctx.fillStyle = "#0f0";
+      ctx.fillRect(10, leftPaddleY, paddleWidth, paddleHeight);
+      ctx.fillStyle = "#f00";
+      ctx.fillRect(PP.INTERNAL_WIDTH - paddleWidth - 10, rightPaddleY, paddleWidth, paddleHeight);
 
-      ctx.fillStyle = "#fff"; ctx.fillRect(ball.x, ball.y, ball.size, ball.size);
+      // balls
+      ctx.fillStyle = "#fff";
+      balls.forEach(ball => ctx.fillRect(ball.x, ball.y, ball.size, ball.size));
     }
 
-    function update(){
+    // Update physics and game logic
+    function update() {
       if (pauseManager.isPaused()) return;
 
-      // left paddle: keyboard or left touch
+      // Left paddle (keyboard or left touch)
       if (keys['w'] || leftTouchUp) leftPaddleY -= paddleSpeed;
       if (keys['s'] || leftTouchDown) leftPaddleY += paddleSpeed;
       leftPaddleY = Math.max(0, Math.min(PP.INTERNAL_HEIGHT - paddleHeight, leftPaddleY));
 
-      // right paddle: keyboard or right touch
+      // Right paddle (keyboard or right touch)
       if (keys['arrowup'] || rightTouchUp) rightPaddleY -= paddleSpeed;
       if (keys['arrowdown'] || rightTouchDown) rightPaddleY += paddleSpeed;
       rightPaddleY = Math.max(0, Math.min(PP.INTERNAL_HEIGHT - paddleHeight, rightPaddleY));
 
-      // ball physics
-      ball.x += ball.vx; ball.y += ball.vy;
-      if (ball.y <= 0 || ball.y + ball.size >= PP.INTERNAL_HEIGHT) ball.vy *= -1;
+      // Move and resolve balls
+      for (let i = balls.length - 1; i >= 0; i--) {
+        const ball = balls[i];
+        ball.x += ball.vx;
+        ball.y += ball.vy;
 
-      // collisions
-      if (ball.x <= 10 + paddleWidth && ball.y + ball.size >= leftPaddleY && ball.y <= leftPaddleY + paddleHeight) {
-        ball.vx = Math.abs(ball.vx); ball.x = 10 + paddleWidth;
-      }
-      if (ball.x + ball.size >= PP.INTERNAL_WIDTH - paddleWidth - 10 && ball.y + ball.size >= rightPaddleY && ball.y <= rightPaddleY + paddleHeight) {
-        ball.vx = -Math.abs(ball.vx); ball.x = PP.INTERNAL_WIDTH - paddleWidth - ball.size - 10;
-      }
+        // top/bottom reflect
+        if (ball.y <= 0) {
+          ball.y = 0;
+          ball.vy *= -1;
+        } else if (ball.y + ball.size >= PP.INTERNAL_HEIGHT) {
+          ball.y = PP.INTERNAL_HEIGHT - ball.size;
+          ball.vy *= -1;
+        }
 
-      // scoring
-      if (ball.x < 0) { rightScore++; resetBall(); }
-      if (ball.x + ball.size > PP.INTERNAL_WIDTH) { leftScore++; resetBall(); }
+        // left paddle collision
+        if (ball.x <= 10 + paddleWidth &&
+            ball.y + ball.size >= leftPaddleY &&
+            ball.y <= leftPaddleY + paddleHeight) {
+          // reflect to the right and tweak angle by impact position
+          const impact = ((ball.y + ball.size / 2) - (leftPaddleY + paddleHeight / 2)) / (paddleHeight / 2);
+          ball.vx = Math.abs(ball.vx);
+          ball.vy += impact * 2;
+          ball.x = 10 + paddleWidth; // prevent sticking
+        }
+
+        // right paddle collision
+        if (ball.x + ball.size >= PP.INTERNAL_WIDTH - paddleWidth - 10 &&
+            ball.y + ball.size >= rightPaddleY &&
+            ball.y <= rightPaddleY + paddleHeight) {
+          const impact = ((ball.y + ball.size / 2) - (rightPaddleY + paddleHeight / 2)) / (paddleHeight / 2);
+          ball.vx = -Math.abs(ball.vx);
+          ball.vy += impact * 2;
+          ball.x = PP.INTERNAL_WIDTH - paddleWidth - ball.size - 10; // prevent sticking
+        }
+
+        // Out of bounds: remove ball and award score
+        if (ball.x < 0) {
+          rightScore++;
+          balls.splice(i, 1);
+        } else if (ball.x + ball.size > PP.INTERNAL_WIDTH) {
+          leftScore++;
+          balls.splice(i, 1);
+        }
+      }
     }
 
-    function resetBall(){
-      ball.x = PP.INTERNAL_WIDTH/2 - ball.size/2;
-      ball.y = PP.INTERNAL_HEIGHT/2 - ball.size/2;
-      ball.vx = 5 * (Math.random() < 0.5 ? 1 : -1);
-      ball.vy = 3 * (Math.random() < 0.5 ? 1 : -1);
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
     }
 
-    function loop(){ update(); draw(); requestAnimationFrame(loop); }
+    // Start spawn logic after first ball moves
+    (function startSpawnWhenFirstMoves() {
+      let oldX = balls[0].x;
+      function check() {
+        if (!spawner.started && balls[0] && balls[0].x !== oldX) {
+          spawner.start();
+        } else {
+          oldX = balls[0]?.x;
+          requestAnimationFrame(check);
+        }
+      }
+      check();
+    })();
 
-    // Support Space key toggling pause and ensure button label syncs
+    // Space toggles pause and syncs button label
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space') {
         e.preventDefault();
@@ -135,11 +193,13 @@
       }
     });
 
-    // Canvas scaling and start
+    // Fit canvas CSS and set internal resolution
     PP.fitCanvasToCSS(canvas);
     window.addEventListener('resize', () => PP.fitCanvasToCSS(canvas));
-    canvas.width = PP.INTERNAL_WIDTH; canvas.height = PP.INTERNAL_HEIGHT;
+    canvas.width = PP.INTERNAL_WIDTH;
+    canvas.height = PP.INTERNAL_HEIGHT;
 
+    // Begin main loop
     loop();
   </script>
 </body>
