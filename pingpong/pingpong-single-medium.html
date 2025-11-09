@@ -1,267 +1,114 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Ping Pong Game - Single Player (Medium)</title>
-  <style>
-    body {
-      background: #222;
-      color: #fff;
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 0;
-      padding: 0;
-    }
-    h1 {
-      margin-top: 20px;
-    }
-    #gameCanvas {
-      background: #111;
-      display: block;
-      margin: 20px auto;
-      border: 2px solid #fff;
-      box-shadow: 0 0 15px #000;
-    }
-    .desc {
-      font-size: 18px;
-      margin-bottom: 10px;
-      color: #ccc;
-    }
-    .paused {
-      position: absolute;
-      left: 0; right: 0;
-      top: 45%;
-      font-size: 64px;
-      color: #ff0;
-      font-weight: bold;
-      text-shadow: 2px 2px 5px #000;
-      pointer-events: none;
-    }
-  </style>
+  <meta charset="utf-8">
+  <title>Ping Pong - Single (Medium)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <h1>Ping Pong Game - Single Player (Medium)</h1>
-  <div class="desc">Player: W/S or ↑/↓ &nbsp;&nbsp; Right: AI (Medium, Multi-ball) &nbsp;&nbsp; Space: Pause/Resume &nbsp;&nbsp; A new ball appears every 10 seconds!</div>
-  <div id="pausedText" class="paused" style="display:none;">PAUSED</div>
-  <canvas id="gameCanvas" width="800" height="500"></canvas>
+  <div class="container">
+    <h1>Ping Pong - Single Player (Medium)</h1>
+    <div class="desc">Use W/S or ↑/↓ or left on-screen buttons. Space: Pause. New ball every 10s.</div>
+
+    <div id="gameWrap">
+      <canvas id="gameCanvas" width="800" height="500"></canvas>
+
+      <div class="touch-controls left">
+        <button id="btn-left-up" class="control-btn">Up</button>
+        <button id="btn-left-down" class="control-btn">Down</button>
+      </div>
+
+      <div id="pausedText" class="paused">PAUSED</div>
+    </div>
+  </div>
+
+  <script src="js/common.js"></script>
+  <script src="js/ai.js"></script>
   <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
+    // Single-player medium
+    const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
     const pausedText = document.getElementById('pausedText');
+    const paddleHeight = 100, paddleWidth = 15, ballSize = 15, paddleSpeed = 7;
+    let leftPaddleY = PP.INTERNAL_HEIGHT/2 - paddleHeight/2, rightPaddleY = PP.INTERNAL_HEIGHT/2 - paddleHeight/2;
+    let leftScore=0, rightScore=0;
+    const keys = PP.Input.initKeyboard();
+    let leftTouchUp=false, leftTouchDown=false;
+    PP.Input.setupButtons([
+      { id:'btn-left-up', onDown: v => leftTouchUp = v },
+      { id:'btn-left-down', onDown: v => leftTouchDown = v }
+    ]);
+    let balls = [], paused=false;
+    const state = { balls, paused, ballOpts: { size: ballSize } };
+    const spawner = new PP.SpawnManager(state);
 
-    const paddleHeight = 100;
-    const paddleWidth = 15;
-    const ballSize = 15;
-    const paddleSpeed = 7;
+    // initial ball
+    (function(){ let b = new PP.Ball({ size: ballSize }); b.vx = 5 * (Math.random() < 0.5 ? 1 : -1); b.vy = 3 * (Math.random() < 0.5 ? 1 : -1); balls.push(b); })();
 
-    let leftPaddleY = canvas.height / 2 - paddleHeight / 2;
-    let rightPaddleY = canvas.height / 2 - paddleHeight / 2;
-    let leftScore = 0;
-    let rightScore = 0;
+    // AI difficulty (medium)
+    const difficulty = { errorRange: 30, speedMultiplier: 0.5, relaxWhenAway: 0.6 };
 
-    let upPressed = false, downPressed = false;
-    let wPressed = false, sPressed = false;
+    // Create a persistent reference object for AI to mutate
+    const rightPaddleRef = { value: rightPaddleY };
 
-    let balls = [];
-    let ballStarted = false;
-    let ballIntervalId = null;
-    let paused = false;
-
-    class Ball {
-      constructor() {
-        this.x = canvas.width / 2 - ballSize / 2;
-        this.y = canvas.height / 2 - ballSize / 2;
-        let angle = Math.random() * Math.PI * 2;
-        let speed = 4 + Math.random() * 2;
-        this.vx = Math.cos(angle) * speed;
-        if (Math.abs(this.vx) < 2) this.vx = 2 * Math.sign(this.vx || 1);
-        this.vy = Math.sin(angle) * speed;
-      }
-    }
-
-    function createInitialBall() {
-      const b = new Ball();
-      b.vx = 5 * (Math.random() < 0.5 ? 1 : -1);
-      b.vy = 3 * (Math.random() < 0.5 ? 1 : -1);
-      balls.push(b);
-    }
-
-    function addBall() {
-      balls.push(new Ball());
-    }
-
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      ctx.strokeStyle = "#fff";
-      ctx.setLineDash([10, 10]);
-      ctx.beginPath();
-      ctx.moveTo(canvas.width / 2, 0);
-      ctx.lineTo(canvas.width / 2, canvas.height);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      ctx.font = "36px Arial";
-      ctx.fillText(leftScore, canvas.width / 2 - 50, 50);
-      ctx.fillText(rightScore, canvas.width / 2 + 30, 50);
-
-      ctx.fillStyle = "#0f0";
-      ctx.fillRect(10, leftPaddleY, paddleWidth, paddleHeight);
-
-      ctx.fillStyle = "#f00";
-      ctx.fillRect(canvas.width - paddleWidth - 10, rightPaddleY, paddleWidth, paddleHeight);
-
-      balls.forEach(ball => {
-        ctx.fillStyle = "#fff";
-        ctx.fillRect(ball.x, ball.y, ballSize, ballSize);
-      });
-      if (paused) {
-        pausedText.style.display = "";
-      } else {
-        pausedText.style.display = "none";
-      }
-    }
-
-    // Medium AI: tracks all balls heading toward AI, moderate error
-    function updateAI() {
-      if (balls.length === 0) return;
-
-      let bestBall = null;
-      let bestTime = Infinity;
-      let bestPrediction = canvas.height / 2;
-
-      for (let ball of balls) {
-        if (ball.vx > 0) {
-          let time = (canvas.width - paddleWidth - 10 - ball.x - ballSize) / ball.vx;
-          if (time > 0 && time < bestTime) {
-            let prediction = ball.y + ball.vy * time;
-            while (prediction < 0 || prediction > canvas.height - ballSize) {
-              if (prediction < 0) prediction = -prediction;
-              else if (prediction > canvas.height - ballSize)
-                prediction = 2 * (canvas.height - ballSize) - prediction;
-            }
-            prediction += Math.random() * 30 - 15; // Moderate error
-            bestBall = ball;
-            bestTime = time;
-            bestPrediction = prediction;
-          }
-        }
-      }
-
-      let aiCenter = rightPaddleY + paddleHeight / 2;
-      if (bestBall) {
-        if (aiCenter < bestPrediction - 10) rightPaddleY += paddleSpeed / 2;
-        else if (aiCenter > bestPrediction + 10) rightPaddleY -= paddleSpeed / 2;
-      } else {
-        let target = canvas.height / 2;
-        if (aiCenter < target - 10) rightPaddleY += paddleSpeed / 2;
-        else if (aiCenter > target + 10) rightPaddleY -= paddleSpeed / 2;
-      }
-      rightPaddleY = Math.max(0, Math.min(canvas.height - paddleHeight, rightPaddleY));
+    function draw(){
+      ctx.clearRect(0,0,PP.INTERNAL_WIDTH,PP.INTERNAL_HEIGHT);
+      ctx.strokeStyle="#fff"; ctx.setLineDash([10,10]); ctx.beginPath(); ctx.moveTo(PP.INTERNAL_WIDTH/2,0); ctx.lineTo(PP.INTERNAL_WIDTH/2,PP.INTERNAL_HEIGHT); ctx.stroke(); ctx.setLineDash([]);
+      ctx.font="36px Arial"; ctx.fillStyle="#fff"; ctx.fillText(leftScore, PP.INTERNAL_WIDTH/2 - 50, 50); ctx.fillText(rightScore, PP.INTERNAL_WIDTH/2 + 30, 50);
+      ctx.fillStyle="#0f0"; ctx.fillRect(10,leftPaddleY,paddleWidth,paddleHeight);
+      ctx.fillStyle="#f00"; ctx.fillRect(PP.INTERNAL_WIDTH - paddleWidth - 10, rightPaddleY, paddleWidth, paddleHeight);
+      ctx.fillStyle="#fff"; balls.forEach(b => ctx.fillRect(b.x, b.y, b.size, b.size));
+      pausedText.style.display = paused ? "" : "none";
     }
 
     function update() {
       if (paused) return;
-      if (wPressed || upPressed) leftPaddleY -= paddleSpeed;
-      if (sPressed || downPressed) leftPaddleY += paddleSpeed;
-      leftPaddleY = Math.max(0, Math.min(canvas.height - paddleHeight, leftPaddleY));
+      if (keys['w'] || keys['arrowup'] || leftTouchUp) leftPaddleY -= paddleSpeed;
+      if (keys['s'] || keys['arrowdown'] || leftTouchDown) leftPaddleY += paddleSpeed;
+      leftPaddleY = Math.max(0, Math.min(PP.INTERNAL_HEIGHT - paddleHeight, leftPaddleY));
 
-      updateAI();
+      // use multi-ball AI helper with persistent ref
+      PP.AI.update(balls, rightPaddleRef, paddleHeight, paddleWidth, difficulty);
+      // copy back mutated value
+      rightPaddleY = Math.max(0, Math.min(PP.INTERNAL_HEIGHT - paddleHeight, rightPaddleRef.value));
 
-      for (let i = balls.length - 1; i >= 0; i--) {
-        let ball = balls[i];
-        ball.x += ball.vx;
-        ball.y += ball.vy;
-
-        if (ball.y <= 0 || ball.y + ballSize >= canvas.height) {
-          ball.vy *= -1;
+      for (let i = balls.length -1; i >= 0; i--) {
+        const ball = balls[i];
+        ball.x += ball.vx; ball.y += ball.vy;
+        if (ball.y <= 0 || ball.y + ball.size >= PP.INTERNAL_HEIGHT) ball.vy *= -1;
+        if (ball.x <= 10 + paddleWidth && ball.y + ball.size >= leftPaddleY && ball.y <= leftPaddleY + paddleHeight) {
+          let impact = ((ball.y + ball.size/2) - (leftPaddleY + paddleHeight/2)) / (paddleHeight/2);
+          ball.vx = Math.abs(ball.vx); ball.vy += impact * 2; ball.x = 10 + paddleWidth;
         }
-
-        if (
-          ball.x <= 10 + paddleWidth &&
-          ball.y + ballSize >= leftPaddleY &&
-          ball.y <= leftPaddleY + paddleHeight
-        ) {
-          let impact = ((ball.y + ballSize/2) - (leftPaddleY + paddleHeight/2)) / (paddleHeight/2);
-          ball.vx = Math.abs(ball.vx);
-          ball.vy += impact * 2;
-          ball.x = 10 + paddleWidth;
+        if (ball.x + ball.size >= PP.INTERNAL_WIDTH - paddleWidth - 10 && ball.y + ball.size >= rightPaddleY && ball.y <= rightPaddleY + paddleHeight) {
+          let impact = ((ball.y + ball.size/2) - (rightPaddleY + paddleHeight/2)) / (paddleHeight/2);
+          ball.vx = -Math.abs(ball.vx); ball.vy += impact * 2; ball.x = PP.INTERNAL_WIDTH - paddleWidth - ball.size - 10;
         }
-
-        if (
-          ball.x + ballSize >= canvas.width - paddleWidth - 10 &&
-          ball.y + ballSize >= rightPaddleY &&
-          ball.y <= rightPaddleY + paddleHeight
-        ) {
-          let impact = ((ball.y + ballSize/2) - (rightPaddleY + paddleHeight/2)) / (paddleHeight/2);
-          ball.vx = -Math.abs(ball.vx);
-          ball.vy += impact * 2;
-          ball.x = canvas.width - paddleWidth - ballSize - 10;
-        }
-
-        if (ball.x < 0) {
-          rightScore++;
-          balls.splice(i, 1);
-        } else if (ball.x + ballSize > canvas.width) {
-          leftScore++;
-          balls.splice(i, 1);
-        }
+        if (ball.x < 0) { rightScore++; balls.splice(i,1); }
+        else if (ball.x + ball.size > PP.INTERNAL_WIDTH) { leftScore++; balls.splice(i,1); }
       }
     }
 
-    function gameLoop() {
-      update();
-      draw();
-      requestAnimationFrame(gameLoop);
-    }
+    function loop(){ update(); draw(); requestAnimationFrame(loop); }
 
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'w' || e.key === 'W') wPressed = true;
-      if (e.key === 's' || e.key === 'S') sPressed = true;
-      if (e.key === 'ArrowUp') upPressed = true;
-      if (e.key === 'ArrowDown') downPressed = true;
-      if (e.code === 'Space') {
-        paused = !paused;
-        if (paused && ballIntervalId) {
-          clearInterval(ballIntervalId);
-          ballIntervalId = null;
-        } else if (!paused && ballStarted && !ballIntervalId) {
-          ballIntervalId = setInterval(() => {
-            addBall();
-          }, 10000);
-        }
-      }
-    });
-    document.addEventListener('keyup', (e) => {
-      if (e.key === 'w' || e.key === 'W') wPressed = false;
-      if (e.key === 's' || e.key === 'S') sPressed = false;
-      if (e.key === 'ArrowUp') upPressed = false;
-      if (e.key === 'ArrowDown') downPressed = false;
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') { paused = !paused; state.paused = paused; if (paused) spawner.pause(); else spawner.resume(); }
     });
 
-    createInitialBall();
-    gameLoop();
+    PP.fitCanvasToCSS(canvas);
+    window.addEventListener('resize', ()=>PP.fitCanvasToCSS(canvas));
+    canvas.width = PP.INTERNAL_WIDTH; canvas.height = PP.INTERNAL_HEIGHT;
 
-    function startBallSpawn() {
-      if (ballStarted) return;
-      ballStarted = true;
-      if (!paused) {
-        ballIntervalId = setInterval(() => {
-          addBall();
-        }, 10000);
+    (function startSpawnWhenFirstMoves(){
+      let oldX = balls[0].x;
+      function check(){
+        if (!spawner.started && balls[0] && balls[0].x !== oldX) spawner.start();
+        else { oldX = balls[0]?.x; requestAnimationFrame(check); }
       }
-    }
+      check();
+    })();
 
-    let oldBallX = balls[0].x;
-    function firstMoveCheck() {
-      if (!ballStarted && balls[0] && balls[0].x !== oldBallX) {
-        startBallSpawn();
-      } else {
-        oldBallX = balls[0]?.x;
-        requestAnimationFrame(firstMoveCheck);
-      }
-    }
-    firstMoveCheck();
+    loop();
   </script>
 </body>
 </html>
