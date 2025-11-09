@@ -1,4 +1,4 @@
-// Shared helpers for Ping Pong games
+// Shared helpers for Ping Pong games (updated: PauseManager + UI helpers)
 // Expose global PP namespace
 window.PP = window.PP || {};
 
@@ -33,11 +33,8 @@ PP.reflectPrediction = function(pred, ballSize, canvasHeight) {
 
 // Fit canvas display size (we keep internal resolution constant for logic)
 PP.fitCanvasToCSS = function(canvas) {
-  // Keep internal resolution fixed; canvas width/height in attributes already set
-  // Only set CSS width to container width for responsiveness (keeps sharpness acceptable)
   const containerWidth = canvas.parentElement.clientWidth;
   canvas.style.width = Math.min(containerWidth, 900) + 'px';
-  // height will auto-scale based on internal aspect ratio (800x500)
 };
 
 // Input helpers: keyboard flags and pointer button wiring
@@ -46,13 +43,10 @@ PP.Input = {
   // initialize keyboard handling, returns keys object
   initKeyboard: function() {
     const keys = this.keys;
-    // store keys using a normalized lowercase name for consistent lookup
     window.addEventListener('keydown', (e) => {
-      // normalize: single character -> lowercase, special keys -> lowercase (e.g., "ArrowUp" -> "arrowup")
       const k = (e.key && e.key.length === 1) ? e.key.toLowerCase() : (String(e.key || '').toLowerCase());
       keys[k] = true;
-      // prevent arrow keys/space default scrolling behavior
-      if (['arrowup','arrowdown',' ' , ' '].includes(k)) e.preventDefault();
+      if (['arrowup','arrowdown',' '].includes(k)) e.preventDefault();
     }, {passive: false});
     window.addEventListener('keyup', (e) => {
       const k = (e.key && e.key.length === 1) ? e.key.toLowerCase() : (String(e.key || '').toLowerCase());
@@ -117,5 +111,80 @@ PP.SpawnManager.prototype.resume = function() {
     this.intervalId = setInterval(() => {
       this.state.balls.push(new PP.Ball(this.state.ballOpts));
     }, 10000);
+  }
+};
+
+// Pause manager: centralizes pause state changes and coordinates with SpawnManager
+PP.PauseManager = function(state, spawner) {
+  this.state = state || { balls: [], paused: false };
+  this.spawner = spawner || null;
+};
+PP.PauseManager.prototype.isPaused = function() {
+  return !!this.state.paused;
+};
+PP.PauseManager.prototype.pause = function() {
+  this.state.paused = true;
+  if (this.spawner && typeof this.spawner.pause === 'function') this.spawner.pause();
+};
+PP.PauseManager.prototype.resume = function() {
+  this.state.paused = false;
+  if (this.spawner && typeof this.spawner.resume === 'function') this.spawner.resume();
+};
+PP.PauseManager.prototype.toggle = function() {
+  if (this.isPaused()) this.resume(); else this.pause();
+};
+
+// UI helpers (pause button wiring, overlay sync)
+PP.UI = {
+  _spaceHandlerRegistered: false,
+
+  // Setup a pause/resume button by id. pauseManager: instance of PP.PauseManager
+  setupPauseButton: function(buttonId, pauseManager, opts = {}) {
+    const btn = document.getElementById(buttonId);
+    if (!btn) return;
+
+    const pausedOverlay = document.getElementById(opts.pausedOverlayId || 'pausedText');
+
+    function updateButtonLabel() {
+      btn.textContent = pauseManager.isPaused() ? (opts.resumeLabel || 'Resume') : (opts.pauseLabel || 'Pause');
+      if (pausedOverlay) pausedOverlay.style.display = pauseManager.isPaused() ? '' : 'none';
+    }
+
+    // pointer handler (pointerdown toggles)
+    function onPointer(e) {
+      e.preventDefault();
+      pauseManager.toggle();
+      updateButtonLabel();
+    }
+    btn.addEventListener('pointerdown', onPointer);
+    // fallback click
+    btn.addEventListener('click', (e) => { e.preventDefault(); });
+
+    // Register a global Space handler once (if desired)
+    if (!PP.UI._spaceHandlerRegistered) {
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          // Try to find a registered pause manager via opts.defaultPauseManager if provided,
+          // otherwise do nothing (pages should call setupPauseButton so button exists)
+          // We'll toggle all known pause managers only if they are passed in via global registry.
+          // For simplicity, if the page stored pauseManager in btn.__pauseManager, toggle that.
+          if (btn && btn.__pauseManager) {
+            btn.__pauseManager.toggle();
+            updateButtonLabel();
+          }
+        }
+      });
+      PP.UI._spaceHandlerRegistered = true;
+    }
+
+    // Attach manager to button for space handler to find
+    btn.__pauseManager = pauseManager;
+
+    // initial label
+    updateButtonLabel();
+
+    // expose update function
+    return { updateButtonLabel };
   }
 };

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <title>Ping Pong - Two Player</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
@@ -9,19 +9,24 @@
 <body>
   <div class="container">
     <h1>Ping Pong - Two Player</h1>
-    <div class="desc">Left: W/S or left buttons. Right: ↑/↓ or right buttons. Space: Pause.</div>
+    <div class="desc">Left: W/S or left buttons. Right: ↑/↓ or right buttons. Space: Pause/Resume.</div>
 
     <div id="gameWrap">
       <canvas id="gameCanvas" width="800" height="500"></canvas>
 
-      <div class="touch-controls left">
+      <div class="touch-controls left" aria-hidden="false">
         <button id="btn-left-up" class="control-btn" aria-label="Left Up">Up</button>
         <button id="btn-left-down" class="control-btn" aria-label="Left Down">Down</button>
       </div>
 
-      <div class="touch-controls right">
+      <div class="touch-controls right" aria-hidden="false">
         <button id="btn-right-up" class="control-btn" aria-label="Right Up">Up</button>
         <button id="btn-right-down" class="control-btn" aria-label="Right Down">Down</button>
+      </div>
+
+      <!-- Center pause/resume button -->
+      <div class="touch-controls center" aria-hidden="false">
+        <button id="btn-pause" class="control-btn pause" aria-label="Pause">Pause</button>
       </div>
 
       <div id="pausedText" class="paused">PAUSED</div>
@@ -30,12 +35,12 @@
 
   <script src="js/common.js"></script>
   <script>
-    // Two-player logic: uses the shared helpers
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const pausedText = document.getElementById('pausedText');
+    // Two-player game: uses shared PauseManager + UI
+    const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+    const pauseBtn = document.getElementById('btn-pause');
 
-    const paddleHeight = 100, paddleWidth = 15, ballSize = 15, paddleSpeed = 7;
+    const paddleHeight = 100, paddleWidth = 15, ballSize = 15;
+    const paddleSpeed = 7;
     let leftPaddleY = PP.INTERNAL_HEIGHT / 2 - paddleHeight / 2;
     let rightPaddleY = PP.INTERNAL_HEIGHT / 2 - paddleHeight / 2;
     let leftScore = 0, rightScore = 0;
@@ -45,15 +50,16 @@
 
     // touch flags
     let leftTouchUp = false, leftTouchDown = false, rightTouchUp = false, rightTouchDown = false;
-    // setup buttons
+
+    // Setup pointer buttons
     PP.Input.setupButtons([
-      { id: 'btn-left-up', onDown: (v) => leftTouchUp = v },
-      { id: 'btn-left-down', onDown: (v) => leftTouchDown = v },
-      { id: 'btn-right-up', onDown: (v) => rightTouchUp = v },
-      { id: 'btn-right-down', onDown: (v) => rightTouchDown = v }
+      { id: 'btn-left-up', onDown: v => leftTouchUp = v },
+      { id: 'btn-left-down', onDown: v => leftTouchDown = v },
+      { id: 'btn-right-up', onDown: v => rightTouchUp = v },
+      { id: 'btn-right-down', onDown: v => rightTouchDown = v }
     ]);
 
-    // ball state (single-ball for two-player)
+    // Single-ball state
     let ball = {
       x: PP.INTERNAL_WIDTH/2 - ballSize/2,
       y: PP.INTERNAL_HEIGHT/2 - ballSize/2,
@@ -62,34 +68,36 @@
       size: ballSize
     };
 
-    let paused = false;
-    function draw() {
+    // Pause state manager (no spawner needed here)
+    const state = { paused: false };
+    const pauseManager = new PP.PauseManager(state, null);
+    const pauseControl = PP.UI.setupPauseButton('btn-pause', pauseManager, { pausedOverlayId: 'pausedText', pauseLabel: 'Pause', resumeLabel: 'Resume' });
+
+    function draw(){
       ctx.clearRect(0,0,PP.INTERNAL_WIDTH,PP.INTERNAL_HEIGHT);
-      // center line
-      ctx.strokeStyle = "#fff"; ctx.setLineDash([10,10]); ctx.beginPath();
-      ctx.moveTo(PP.INTERNAL_WIDTH/2, 0); ctx.lineTo(PP.INTERNAL_WIDTH/2, PP.INTERNAL_HEIGHT); ctx.stroke(); ctx.setLineDash([]);
-      // scores
+      ctx.strokeStyle = "#fff"; ctx.setLineDash([10,10]);
+      ctx.beginPath(); ctx.moveTo(PP.INTERNAL_WIDTH/2,0); ctx.lineTo(PP.INTERNAL_WIDTH/2,PP.INTERNAL_HEIGHT); ctx.stroke(); ctx.setLineDash([]);
       ctx.font = "36px Arial"; ctx.fillStyle = "#fff";
       ctx.fillText(leftScore, PP.INTERNAL_WIDTH/2 - 50, 50);
       ctx.fillText(rightScore, PP.INTERNAL_WIDTH/2 + 30, 50);
-      // paddles
+
       ctx.fillStyle = "#0f0"; ctx.fillRect(10, leftPaddleY, paddleWidth, paddleHeight);
       ctx.fillStyle = "#f00"; ctx.fillRect(PP.INTERNAL_WIDTH - paddleWidth - 10, rightPaddleY, paddleWidth, paddleHeight);
-      // ball
+
       ctx.fillStyle = "#fff"; ctx.fillRect(ball.x, ball.y, ball.size, ball.size);
-      // paused overlay
-      pausedText.style.display = paused ? "" : "none";
     }
 
-    function update() {
-      if (paused) return;
-      // left paddle (keyboard W/S or pointer)
+    function update(){
+      if (pauseManager.isPaused()) return;
+
+      // left paddle: keyboard or left touch
       if (keys['w'] || leftTouchUp) leftPaddleY -= paddleSpeed;
       if (keys['s'] || leftTouchDown) leftPaddleY += paddleSpeed;
       leftPaddleY = Math.max(0, Math.min(PP.INTERNAL_HEIGHT - paddleHeight, leftPaddleY));
-      // right paddle (keyboard ArrowUp/ArrowDown or pointer)
-      if (keys['ArrowUp'] || rightTouchUp) rightPaddleY -= paddleSpeed;
-      if (keys['ArrowDown'] || rightTouchDown) rightPaddleY += paddleSpeed;
+
+      // right paddle: keyboard or right touch
+      if (keys['arrowup'] || rightTouchUp) rightPaddleY -= paddleSpeed;
+      if (keys['arrowdown'] || rightTouchDown) rightPaddleY += paddleSpeed;
       rightPaddleY = Math.max(0, Math.min(PP.INTERNAL_HEIGHT - paddleHeight, rightPaddleY));
 
       // ball physics
@@ -109,27 +117,29 @@
       if (ball.x + ball.size > PP.INTERNAL_WIDTH) { leftScore++; resetBall(); }
     }
 
-    function resetBall() {
+    function resetBall(){
       ball.x = PP.INTERNAL_WIDTH/2 - ball.size/2;
       ball.y = PP.INTERNAL_HEIGHT/2 - ball.size/2;
       ball.vx = 5 * (Math.random() < 0.5 ? 1 : -1);
       ball.vy = 3 * (Math.random() < 0.5 ? 1 : -1);
     }
 
-    function loop() { update(); draw(); requestAnimationFrame(loop); }
+    function loop(){ update(); draw(); requestAnimationFrame(loop); }
 
-    // Keyboard pause toggle
+    // Support Space key toggling pause and ensure button label syncs
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space') {
-        paused = !paused;
+        e.preventDefault();
+        pauseManager.toggle();
+        if (pauseControl && typeof pauseControl.updateButtonLabel === 'function') pauseControl.updateButtonLabel();
       }
     });
 
-    // fit canvas scaling and start
+    // Canvas scaling and start
     PP.fitCanvasToCSS(canvas);
     window.addEventListener('resize', () => PP.fitCanvasToCSS(canvas));
-    // Set canvas internal resolution for drawing context
     canvas.width = PP.INTERNAL_WIDTH; canvas.height = PP.INTERNAL_HEIGHT;
+
     loop();
   </script>
 </body>

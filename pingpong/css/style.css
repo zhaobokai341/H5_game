@@ -1,4 +1,4 @@
-/* Shared styles for all pingpong pages */
+/* Shared styles for all pingpong pages (updated: center pause control) */
 html, body {
   height: 100%;
   margin: 0;
@@ -61,6 +61,9 @@ h1 {
 }
 .touch-controls.left { left: 12px; bottom: 12px; }
 .touch-controls.right { right: 12px; bottom: 12px; }
+/* center helper: place controls (like pause) centered at bottom */
+.touch-controls.center { left: 50%; transform: translateX(-50%); bottom: 12px; }
+
 .control-btn {
   width: 64px;
   height: 64px;
@@ -77,9 +80,17 @@ h1 {
 }
 .control-btn:active { background: rgba(255,255,255,0.14); transform: translateY(1px); }
 
+/* make pause/resume slightly wider for readability */
+.control-btn.pause {
+  width: 92px;
+  font-weight: 600;
+}
+
+/* Small screen adjustments */
 @media (max-width: 480px) {
   .control-btn { width: 56px; height: 56px; font-size: 14px; }
   .touch-controls { gap: 8px; left: 8px; bottom: 8px; right: 8px; }
+  .control-btn.pause { width: 80px; }
 }
 
 /* PAUSED overlay */
@@ -97,7 +108,7 @@ h1 {
   display: none;
 }
 
-/* Home page game list (was missing after refactor) */
+/* Home page game list */
 .games-list {
   margin: 40px auto 0;
   display: flex;

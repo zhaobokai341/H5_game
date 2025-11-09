@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <title>Ping Pong - Single (Easy)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="css/style.css">
@@ -9,7 +9,7 @@
 <body>
   <div class="container">
     <h1>Ping Pong - Single Player (Easy)</h1>
-    <div class="desc">Use W/S or ↑/↓ or left on-screen buttons. Space: Pause. New ball every 10s.</div>
+    <div class="desc">Player: W/S or ↑/↓ or use the On-screen buttons (left). Pause: Space or center button. New ball every 10 seconds.</div>
 
     <div id="gameWrap">
       <canvas id="gameCanvas" width="800" height="500"></canvas>
@@ -19,6 +19,11 @@
         <button id="btn-left-down" class="control-btn">Down</button>
       </div>
 
+      <!-- Center pause/resume button -->
+      <div class="touch-controls center">
+        <button id="btn-pause" class="control-btn pause" aria-label="Pause">Pause</button>
+      </div>
+
       <div id="pausedText" class="paused">PAUSED</div>
     </div>
   </div>
@@ -26,105 +31,92 @@
   <script src="js/common.js"></script>
   <script src="js/ai.js"></script>
   <script>
-    // Single-player easy: uses PP helpers + AI difficulty config
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const pausedText = document.getElementById('pausedText');
-
+    // Single-player easy with centralized pause
+    const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+    const pauseBtn = document.getElementById('btn-pause');
     const paddleHeight = 100, paddleWidth = 15, ballSize = 15, paddleSpeed = 7;
-    let leftPaddleY = PP.INTERNAL_HEIGHT/2 - paddleHeight/2;
-    let rightPaddleY = PP.INTERNAL_HEIGHT/2 - paddleHeight/2;
+
+    let leftPaddleY = PP.INTERNAL_HEIGHT / 2 - paddleHeight / 2;
+    let rightPaddleY = PP.INTERNAL_HEIGHT / 2 - paddleHeight / 2;
     let leftScore = 0, rightScore = 0;
 
     const keys = PP.Input.initKeyboard();
-    let leftTouchUp=false, leftTouchDown=false;
+    let leftTouchUp = false, leftTouchDown = false;
     PP.Input.setupButtons([
-      { id: 'btn-left-up', onDown: (v)=> leftTouchUp = v },
-      { id: 'btn-left-down', onDown: (v)=> leftTouchDown = v }
+      { id: 'btn-left-up', onDown: v => leftTouchUp = v },
+      { id: 'btn-left-down', onDown: v => leftTouchDown = v }
     ]);
 
-    // multi-ball state
+    // Multi-ball state and spawner
     let balls = [];
-    let paused = false;
-    // spawn manager
-    const state = { balls, paused, ballOpts: { size: ballSize } };
+    const state = { balls, paused: false, ballOpts: { size: ballSize } };
     const spawner = new PP.SpawnManager(state);
 
     // initial ball
-    function addInitial() {
-      let b = new PP.Ball({ size: ballSize });
-      // set classic initial direction
-      b.vx = 5 * (Math.random() < 0.5 ? 1 : -1);
-      b.vy = 3 * (Math.random() < 0.5 ? 1 : -1);
-      balls.push(b);
-    }
-    addInitial();
+    (function(){ const b = new PP.Ball({ size: ballSize }); b.vx = 5 * (Math.random() < 0.5 ? 1 : -1); b.vy = 3 * (Math.random() < 0.5 ? 1 : -1); balls.push(b); })();
 
-    // AI difficulty config (easy)
+    // Easy AI (track first ball only)
     const difficulty = { errorRange: 60, speedMultiplier: 0.4, relaxWhenAway: 0.4 };
+
+    // Pause manager wired to spawner
+    const pauseManager = new PP.PauseManager(state, spawner);
+    const pauseControl = PP.UI.setupPauseButton('btn-pause', pauseManager, { pausedOverlayId: 'pausedText', pauseLabel: 'Pause', resumeLabel: 'Resume' });
+
+    function updateAI() {
+      if (balls.length === 0) return;
+      const b = balls[0];
+      if (b.vx > 0) {
+        let time = (PP.INTERNAL_WIDTH - paddleWidth - 10 - b.x - b.size) / b.vx;
+        if (time > 0) {
+          let pred = b.y + b.vy * time;
+          pred = PP.reflectPrediction(pred, b.size, PP.INTERNAL_HEIGHT);
+          pred += (Math.random() * difficulty.errorRange - difficulty.errorRange / 2);
+          let aiCenter = rightPaddleY + paddleHeight / 2;
+          if (aiCenter < pred - 25) rightPaddleY += Math.max(1, paddleSpeed * difficulty.speedMultiplier);
+          else if (aiCenter > pred + 25) rightPaddleY -= Math.max(1, paddleSpeed * difficulty.speedMultiplier);
+          rightPaddleY = Math.max(0, Math.min(PP.INTERNAL_HEIGHT - paddleHeight, rightPaddleY));
+        }
+      } else {
+        let target = PP.INTERNAL_HEIGHT / 2, aiCenter = rightPaddleY + paddleHeight / 2;
+        if (aiCenter < target - 20) rightPaddleY += (paddleSpeed - 4) / 2;
+        else if (aiCenter > target + 20) rightPaddleY -= (paddleSpeed - 4) / 2;
+        rightPaddleY = Math.max(0, Math.min(PP.INTERNAL_HEIGHT - paddleHeight, rightPaddleY));
+      }
+    }
 
     function draw() {
       ctx.clearRect(0,0,PP.INTERNAL_WIDTH,PP.INTERNAL_HEIGHT);
-      ctx.strokeStyle = "#fff"; ctx.setLineDash([10,10]); ctx.beginPath(); ctx.moveTo(PP.INTERNAL_WIDTH/2,0); ctx.lineTo(PP.INTERNAL_WIDTH/2,PP.INTERNAL_HEIGHT); ctx.stroke(); ctx.setLineDash([]);
-      ctx.font = "36px Arial"; ctx.fillStyle = "#fff"; ctx.fillText(leftScore, PP.INTERNAL_WIDTH/2 - 50, 50); ctx.fillText(rightScore, PP.INTERNAL_WIDTH/2 + 30, 50);
-      ctx.fillStyle = "#0f0"; ctx.fillRect(10, leftPaddleY, paddleWidth, paddleHeight);
-      ctx.fillStyle = "#f00"; ctx.fillRect(PP.INTERNAL_WIDTH - paddleWidth - 10, rightPaddleY, paddleWidth, paddleHeight);
-      ctx.fillStyle = "#fff"; balls.forEach(ball => ctx.fillRect(ball.x, ball.y, ball.size, ball.size));
-      pausedText.style.display = paused ? "" : "none";
-    }
-
-    function updateAI() {
-      // Use PP.AI with easy params
-      PP.AI.update(balls, { value: rightPaddleY }, paddleHeight, paddleWidth, difficulty);
-      // copy back mutated value
-      rightPaddleY = Math.max(0, Math.min(PP.INTERNAL_HEIGHT - paddleHeight, rightPaddleY));
+      ctx.strokeStyle="#fff"; ctx.setLineDash([10,10]); ctx.beginPath(); ctx.moveTo(PP.INTERNAL_WIDTH/2,0); ctx.lineTo(PP.INTERNAL_WIDTH/2,PP.INTERNAL_HEIGHT); ctx.stroke(); ctx.setLineDash([]);
+      ctx.font="36px Arial"; ctx.fillStyle="#fff"; ctx.fillText(leftScore, PP.INTERNAL_WIDTH/2 - 50, 50); ctx.fillText(rightScore, PP.INTERNAL_WIDTH/2 + 30, 50);
+      ctx.fillStyle="#0f0"; ctx.fillRect(10, leftPaddleY, paddleWidth, paddleHeight);
+      ctx.fillStyle="#f00"; ctx.fillRect(PP.INTERNAL_WIDTH - paddleWidth - 10, rightPaddleY, paddleWidth, paddleHeight);
+      ctx.fillStyle="#fff"; balls.forEach(b => ctx.fillRect(b.x, b.y, b.size, b.size));
     }
 
     function update() {
-      if (paused) return;
-      // left paddle movement: keyboard or touch buttons
+      if (pauseManager.isPaused()) return;
+
       if (keys['w'] || keys['arrowup'] || leftTouchUp) leftPaddleY -= paddleSpeed;
       if (keys['s'] || keys['arrowdown'] || leftTouchDown) leftPaddleY += paddleSpeed;
       leftPaddleY = Math.max(0, Math.min(PP.INTERNAL_HEIGHT - paddleHeight, leftPaddleY));
 
-      // AI update
-      // For easy we will only track the first ball to keep it easier
-      if (balls.length > 0) {
-        const b = balls[0];
-        if (b.vx > 0) {
-          let time = (PP.INTERNAL_WIDTH - paddleWidth - 10 - b.x - b.size) / b.vx;
-          if (time > 0) {
-            let pred = b.y + b.vy * time;
-            pred = PP.reflectPrediction(pred, b.size, PP.INTERNAL_HEIGHT);
-            pred += (Math.random() * difficulty.errorRange - difficulty.errorRange / 2);
-            let aiCenter = rightPaddleY + paddleHeight/2;
-            if (aiCenter < pred - 25) rightPaddleY += Math.max(1, paddleSpeed * difficulty.speedMultiplier);
-            else if (aiCenter > pred + 25) rightPaddleY -= Math.max(1, paddleSpeed * difficulty.speedMultiplier);
-            rightPaddleY = Math.max(0, Math.min(PP.INTERNAL_HEIGHT - paddleHeight, rightPaddleY));
-          }
-        }
-      }
+      updateAI();
 
-      // balls update
       for (let i = balls.length - 1; i >= 0; i--) {
         const ball = balls[i];
         ball.x += ball.vx; ball.y += ball.vy;
         if (ball.y <= 0 || ball.y + ball.size >= PP.INTERNAL_HEIGHT) ball.vy *= -1;
-        // left paddle collision
+
         if (ball.x <= 10 + paddleWidth && ball.y + ball.size >= leftPaddleY && ball.y <= leftPaddleY + paddleHeight) {
           let impact = ((ball.y + ball.size/2) - (leftPaddleY + paddleHeight/2)) / (paddleHeight/2);
-          ball.vx = Math.abs(ball.vx);
-          ball.vy += impact * 2;
-          ball.x = 10 + paddleWidth;
+          ball.vx = Math.abs(ball.vx); ball.vy += impact * 2; ball.x = 10 + paddleWidth;
         }
-        // right paddle collision
+
         if (ball.x + ball.size >= PP.INTERNAL_WIDTH - paddleWidth - 10 && ball.y + ball.size >= rightPaddleY && ball.y <= rightPaddleY + paddleHeight) {
           let impact = ((ball.y + ball.size/2) - (rightPaddleY + paddleHeight/2)) / (paddleHeight/2);
-          ball.vx = -Math.abs(ball.vx);
-          ball.vy += impact * 2;
-          ball.x = PP.INTERNAL_WIDTH - paddleWidth - ball.size - 10;
+          ball.vx = -Math.abs(ball.vx); ball.vy += impact * 2; ball.x = PP.INTERNAL_WIDTH - paddleWidth - ball.size - 10;
         }
-        // walls -> remove ball and award score
+
         if (ball.x < 0) { rightScore++; balls.splice(i,1); }
         else if (ball.x + ball.size > PP.INTERNAL_WIDTH) { leftScore++; balls.splice(i,1); }
       }
@@ -132,12 +124,12 @@
 
     function loop() { update(); draw(); requestAnimationFrame(loop); }
 
-    // controls: pause toggle
+    // Space key toggles pause and keep button label in sync
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space') {
-        paused = !paused;
-        state.paused = paused;
-        if (paused) spawner.pause(); else spawner.resume();
+        e.preventDefault();
+        pauseManager.toggle();
+        if (pauseControl && typeof pauseControl.updateButtonLabel === 'function') pauseControl.updateButtonLabel();
       }
     });
 
@@ -146,16 +138,12 @@
     window.addEventListener('resize', ()=>PP.fitCanvasToCSS(canvas));
     canvas.width = PP.INTERNAL_WIDTH; canvas.height = PP.INTERNAL_HEIGHT;
 
-    // Spawn manager: start after first ball moves
+    // start spawn after first move
     (function startSpawnWhenFirstMoves(){
       let oldX = balls[0].x;
       function check(){
-        if (!spawner.started && balls[0] && balls[0].x !== oldX) {
-          spawner.start();
-        } else {
-          oldX = balls[0]?.x;
-          requestAnimationFrame(check);
-        }
+        if (!spawner.started && balls[0] && balls[0].x !== oldX) spawner.start();
+        else { oldX = balls[0]?.x; requestAnimationFrame(check); }
       }
       check();
     })();
