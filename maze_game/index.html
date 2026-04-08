@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maze Explorer - Pro Version</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="minimap-container" onclick="toggleMap()">
+            <div id="minimap"></div>
+            <div id="nav-hint"></div>
+            <small id="map-label">VIEW MAP</small>
+        </div>
+
+        <div class="controls">
+            <label>Size:</label>
+            <input type="number" id="sizeInput" value="25" min="11" max="75">
+            <button onclick="initGame()">Generate</button>
+        </div>
+
+        <div class="stats">Time: <span id="timer">0</span>s</div>
+        
+        <div id="maze-viewport"></div>
+        
+        <p id="status">Use Arrow Keys to Start!</p>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
