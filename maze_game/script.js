@@ -31,7 +31,7 @@ function generateMaze(size) {
     return grid;
 }
 
-function renderMainView() {
+function render() {
     const viewport = document.getElementById('maze-viewport');
     viewport.innerHTML = '';
     let vX = Math.max(0, Math.min(playerPos.x - 5, SIZE - VIEW_SIZE));
@@ -48,30 +48,8 @@ function renderMainView() {
     }
 }
 
-// NEW: Specifically updates only the player dot on the map for performance
-function updateMapPlayer() {
-    const container = document.getElementById('minimap-container');
-    if (!container.classList.contains('zoomed')) return;
-
-    // Remove old player position from map
-    const oldPlayer = document.querySelector('.m-player');
-    if (oldPlayer) oldPlayer.classList.remove('m-player');
-
-    // Find the new cell in the grid and mark it
-    const mapCells = document.getElementById('minimap').children;
-    const index = playerPos.y * SIZE + playerPos.x;
-    if (mapCells[index]) {
-        mapCells[index].classList.add('m-player');
-    }
-
-    // Update the GPS text
-    let v = playerPos.y < goalPos.y ? "South" : playerPos.y > goalPos.y ? "North" : "";
-    let h = playerPos.x < goalPos.x ? "East" : playerPos.x > goalPos.x ? "West" : "";
-    document.getElementById('nav-hint').innerText = `Location Intel: ${v} ${h}`;
-}
-
 function movePlayer(dx, dy) {
-    if (!gameActive) return;
+    if (!gameActive || document.getElementById('minimap-container').classList.contains('zoomed')) return;
 
     if (!timerStarted) {
         timerStarted = true;
@@ -87,15 +65,11 @@ function movePlayer(dx, dy) {
     if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && mazeLayout[ny][nx] !== 1) {
         playerPos.x = nx;
         playerPos.y = ny;
-        renderMainView();
-        
-        // Update the map location if the map is open
-        updateMapPlayer();
-
+        render();
         if (mazeLayout[ny][nx] === 3) {
             gameActive = false;
             clearInterval(timerInterval);
-            document.getElementById('status').innerText = `🏁 Finished in ${secondsElapsed}s!`;
+            document.getElementById('status').innerText = `🏆 Escaped in ${secondsElapsed}s!`;
         }
     }
 }
@@ -104,24 +78,23 @@ function toggleMap() {
     const container = document.getElementById('minimap-container');
     const isZoomed = container.classList.toggle('zoomed');
     const minimap = document.getElementById('minimap');
+    const navHint = document.getElementById('nav-hint');
 
     if (isZoomed) {
         minimap.style.gridTemplateColumns = `repeat(${SIZE}, 1fr)`;
-        minimap.innerHTML = ''; // Fresh render of the map layout
         for (let y = 0; y < SIZE; y++) {
             for (let x = 0; x < SIZE; x++) {
                 const div = document.createElement('div');
-                const type = mazeLayout[y][x];
-                div.className = `m-cell ${type === 1 ? 'm-wall' : type === 3 ? 'm-goal' : 'm-path'}`;
+                div.className = `m-cell ${mazeLayout[y][x] === 1 ? 'm-wall' : mazeLayout[y][x] === 3 ? 'm-goal' : 'm-path'}`;
                 if (playerPos.x === x && playerPos.y === y) div.classList.add('m-player');
                 minimap.appendChild(div);
             }
         }
-        updateMapPlayer();
-        document.getElementById('map-label').innerText = "CLOSE";
+        let v = playerPos.y < goalPos.y ? "South" : playerPos.y > goalPos.y ? "North" : "";
+        let h = playerPos.x < goalPos.x ? "East" : playerPos.x > goalPos.x ? "West" : "";
+        navHint.innerText = `Direction: ${v} ${h}`;
     } else {
         minimap.innerHTML = '';
-        document.getElementById('map-label').innerText = "VIEW MAP";
     }
 }
 
@@ -134,8 +107,7 @@ function initGame() {
     mazeLayout = generateMaze(reqSize);
     playerPos = { x: 1, y: 1 };
     gameActive = true;
-    document.getElementById('status').innerText = "Find the Exit!";
-    renderMainView();
+    render();
 }
 
 window.addEventListener('keydown', (e) => {
