@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Maze Explorer - Mobile Ready</title>
+    <title>Maze Explorer - Live Map</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,7 +15,7 @@
             <small id="map-label">VIEW MAP</small>
         </div>
 
-        <div class="header-controls">
+        <div class="header">
             <input type="number" id="sizeInput" value="21" min="11" max="51">
             <button onclick="initGame()">New Game</button>
         </div>
@@ -25,12 +25,12 @@
         <div id="maze-viewport"></div>
 
         <div class="dpad">
-            <button class="dbtn up" ontouchstart="movePlayer(0, -1)" onmousedown="movePlayer(0, -1)">▲</button>
+            <button class="dbtn up" onmousedown="handleMove(0, -1)" ontouchstart="handleMove(0, -1)">▲</button>
             <div class="dpad-mid">
-                <button class="dbtn left" ontouchstart="movePlayer(-1, 0)" onmousedown="movePlayer(-1, 0)">◀</button>
-                <button class="dbtn right" ontouchstart="movePlayer(1, 0)" onmousedown="movePlayer(1, 0)">▶</button>
+                <button class="dbtn left" onmousedown="handleMove(-1, 0)" ontouchstart="handleMove(-1, 0)">◀</button>
+                <button class="dbtn right" onmousedown="handleMove(1, 0)" ontouchstart="handleMove(1, 0)">▶</button>
             </div>
-            <button class="dbtn down" ontouchstart="movePlayer(0, 1)" onmousedown="movePlayer(0, 1)">▼</button>
+            <button class="dbtn down" onmousedown="handleMove(0, 1)" ontouchstart="handleMove(0, 1)">▼</button>
         </div>
         
         <p id="status">Find the Exit!</p>
