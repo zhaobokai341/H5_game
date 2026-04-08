@@ -1,0 +1,124 @@
+:root {
+    --wall-color: #1a1a2e;
+    --path-color: #ffffff;
+    --player-color: #ff4d4d;
+    --goal-color: #00d2ff;
+    --viewport-size: 10;
+    --cell-size: 40px;
+}
+
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0f3460;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    color: white;
+    overflow: hidden;
+}
+
+#game-container {
+    position: relative;
+    text-align: center;
+    background: #16213e;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+}
+
+/* Controls */
+.controls {
+    margin-bottom: 15px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+}
+
+input {
+    width: 50px;
+    padding: 5px;
+    border-radius: 4px;
+    border: none;
+    text-align: center;
+}
+
+/* Map System */
+#minimap-container {
+    position: absolute;
+    top: 20px;
+    right: -130px;
+    cursor: pointer;
+    z-index: 100;
+    background: #1a1a2e;
+    padding: 10px;
+    border-radius: 8px;
+    border: 2px solid rgba(255,255,255,0.1);
+    transition: transform 0.2s ease;
+}
+
+#minimap {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    background: #000; 
+}
+
+#minimap-container.zoomed {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    right: auto;
+    background: rgba(5, 5, 15, 0.98);
+    padding: 30px;
+    border: 2px solid var(--goal-color);
+    max-height: 90vh;
+    max-width: 90vw;
+    overflow: auto;
+}
+
+#minimap-container.zoomed #minimap {
+    width: auto;
+    height: auto;
+}
+
+#nav-hint {
+    display: none;
+    margin-top: 20px;
+    font-weight: bold;
+    color: #ffbc00;
+    font-size: 1.2rem;
+}
+
+.zoomed #nav-hint { display: block; }
+
+/* Map Cells */
+.m-cell { width: 10px; height: 10px; }
+.m-wall { background: #333; }
+.m-path { background: #bbb; }
+.m-goal { background: var(--goal-color); box-shadow: 0 0 8px var(--goal-color); }
+.m-player { background: yellow; animation: blink 0.6s infinite; }
+
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+/* Main Maze */
+#maze-viewport {
+    display: grid;
+    grid-template-columns: repeat(var(--viewport-size), var(--cell-size));
+    grid-template-rows: repeat(var(--viewport-size), var(--cell-size));
+    border: 5px solid var(--wall-color);
+    background: var(--wall-color);
+}
+
+.cell { width: var(--cell-size); height: var(--cell-size); }
+.wall { background-color: var(--wall-color); }
+.path { background-color: var(--path-color); }
+.player { background-color: var(--player-color); border-radius: 50%; transform: scale(0.8); }
+.goal { background-color: var(--goal-color); }
+
+.stats { margin-bottom: 10px; font-size: 1.2rem; }
+button { padding: 6px 15px; cursor: pointer; background: var(--goal-color); border: none; border-radius: 4px; font-weight: bold; }
