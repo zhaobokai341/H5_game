@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Maze Explorer - Pro Version</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Maze Explorer - Mobile Ready</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,17 +15,25 @@
             <small id="map-label">VIEW MAP</small>
         </div>
 
-        <div class="controls">
-            <label>Size:</label>
-            <input type="number" id="sizeInput" value="25" min="11" max="75">
-            <button onclick="initGame()">Generate</button>
+        <div class="header-controls">
+            <input type="number" id="sizeInput" value="21" min="11" max="51">
+            <button onclick="initGame()">New Game</button>
         </div>
 
         <div class="stats">Time: <span id="timer">0</span>s</div>
         
         <div id="maze-viewport"></div>
+
+        <div class="dpad">
+            <button class="dbtn up" ontouchstart="movePlayer(0, -1)" onmousedown="movePlayer(0, -1)">▲</button>
+            <div class="dpad-mid">
+                <button class="dbtn left" ontouchstart="movePlayer(-1, 0)" onmousedown="movePlayer(-1, 0)">◀</button>
+                <button class="dbtn right" ontouchstart="movePlayer(1, 0)" onmousedown="movePlayer(1, 0)">▶</button>
+            </div>
+            <button class="dbtn down" ontouchstart="movePlayer(0, 1)" onmousedown="movePlayer(0, 1)">▼</button>
+        </div>
         
-        <p id="status">Use Arrow Keys to Start!</p>
+        <p id="status">Find the Exit!</p>
     </div>
 
     <script src="script.js"></script>
