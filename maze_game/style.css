@@ -27,58 +27,65 @@ body {
     padding: 15px;
     border-radius: 15px;
     width: 95vw;
-    max-width: 380px;
+    max-width: 400px;
 }
 
-.header { margin-bottom: 10px; }
-input { width: 50px; padding: 5px; border-radius: 4px; border: none; }
-
-/* Minimap Styles */
+/* Map Logic */
 #minimap-container {
     position: absolute;
-    top: 15px;
-    right: -100px;
+    top: 10px;
+    right: 10px;
     cursor: pointer;
     background: #1a1a2e;
-    padding: 8px;
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.2);
+    padding: 5px;
+    border-radius: 5px;
+    border: 1px solid white;
     z-index: 100;
 }
 
-#minimap { display: grid; width: 40px; height: 40px; background: #000; }
+#minimap { 
+    display: grid; 
+    width: 40px; 
+    height: 40px; 
+    background: #000;
+}
 
+/* ZOOMED STATE - This fixes the "weird" appearance */
 #minimap-container.zoomed {
     position: fixed;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: auto; height: auto;
-    background: rgba(0,0,0,0.95);
-    padding: 25px;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(10, 10, 30, 0.95);
+    border: none;
+    border-radius: 0;
+}
+
+#minimap-container.zoomed #minimap {
+    width: 90vmin; /* Responsive sizing based on screen */
+    height: 90vmin;
+    /* This variable is set in JS based on maze size */
+    grid-template-columns: repeat(var(--maze-columns), 1fr);
+    grid-template-rows: repeat(var(--maze-columns), 1fr);
     border: 2px solid var(--goal-color);
 }
 
-#minimap-container.zoomed #minimap { width: auto; height: auto; }
-
-.m-cell { width: 10px; height: 10px; }
+.m-cell { width: 100%; height: 100%; }
 .m-wall { background: #333; }
-.m-path { background: #999; }
+.m-path { background: #bbb; }
 .m-goal { background: var(--goal-color); }
-.m-player { 
-    background: #ffff00 !important; 
-    border-radius: 50%;
-    box-shadow: 0 0 10px #ffff00;
-    z-index: 5;
-}
+.m-player { background: yellow !important; border-radius: 50%; }
 
-#nav-hint { display: none; margin-top: 15px; color: #ffbc00; font-weight: bold; }
+#nav-hint { display: none; color: #ffbc00; font-size: 1.2rem; margin-top: 20px; }
 .zoomed #nav-hint { display: block; }
 
-/* Main Viewport */
+/* Main Game */
 #maze-viewport {
     display: grid;
     grid-template-columns: repeat(var(--viewport-size), var(--cell-size));
-    grid-template-rows: repeat(var(--viewport-size), var(--cell-size));
     margin: 10px auto;
     border: 3px solid var(--wall-color);
 }
@@ -89,17 +96,15 @@ input { width: 50px; padding: 5px; border-radius: 4px; border: none; }
 .player { background: var(--player-color); border-radius: 50%; transform: scale(0.8); }
 .goal { background: var(--goal-color); }
 
-/* D-Pad */
-.dpad { display: flex; flex-direction: column; align-items: center; margin-top: 15px; }
-.dpad-mid { display: flex; gap: 45px; }
+/* Buttons */
+.dpad { display: flex; flex-direction: column; align-items: center; margin-top: 10px; }
+.dpad-mid { display: flex; gap: 40px; }
 .dbtn {
     width: 55px; height: 55px;
-    background: rgba(255,255,255,0.05);
+    background: #1a1a2e;
     border: 2px solid var(--goal-color);
     color: var(--goal-color);
     border-radius: 50%;
     font-size: 20px;
-    cursor: pointer;
-    user-select: none;
+    margin: 2px;
 }
-.dbtn:active { background: var(--goal-color); color: #16213e; }
